@@ -1,22 +1,22 @@
 import pandas as pd
 import numpy as np
 from sklearn.base import TransformerMixin,BaseEstimator
-from sklearn.impute import SimpleImputer
-from scipy.stats import iqr
+from scipy.stats import iqr, shapiro
 
 import holidays
 
 class TimeHandler(TransformerMixin,BaseEstimator):
     """ Splits the time into hour, minute
-        Creates features such as Period, Military Time
+        Creates features such as period, military_time
     """
-    def __init__(self,time_cols_names:list,return_whole_df:bool,drop_original_col = True):
+    def __init__(self,time_cols_names:list,return_whole_df= True,drop_original_col = True,time_format="%H:%M"):
         self.return_whole_df = return_whole_df
         self.cols = []
         self.time_cols_names = time_cols_names
-        self.added_cols_suffix = ["Hour","Minute","MilitaryTime","PeriodName","PeriodNum"]
+        self.added_cols_suffix = ["hour","minute","military_time","period_name","period_num"]
         self.added_cols = []
         self.drop_original_col = drop_original_col
+        self.time_format = time_format
 
     def fit(self,df,y=None):
         self.cols = list(df.columns)
@@ -62,17 +62,17 @@ class TimeHandler(TransformerMixin,BaseEstimator):
     def transform(self,df,*_):
         copy = df.copy()
         for time_col_name in self.time_cols_names:
-            copy[time_col_name] = pd.to_datetime(copy[time_col_name],format="%H:%M")
+            copy[time_col_name] = pd.to_datetime(copy[time_col_name],format=self.time_format)
 
-            copy[time_col_name+"_"+"Hour"] = copy[time_col_name].dt.hour
-            copy[time_col_name+"_"+"Minute"] = copy[time_col_name].dt.minute
+            copy[time_col_name+"_"+"hour"] = copy[time_col_name].dt.hour
+            copy[time_col_name+"_"+"minute"] = copy[time_col_name].dt.minute
             # Military Time
-            copy[time_col_name+"_"+"MilitaryTime"] = (copy[time_col_name+"_"+"Hour"].astype(str) + copy[time_col_name+"_"+"Minute"].astype(str)).astype(int)
+            copy[time_col_name+"_"+"military_time"] = (copy[time_col_name+"_"+"hour"].astype(str) + copy[time_col_name+"_"+"minute"].astype(str)).astype(int)
 
             # Time Period
-            copy[time_col_name+"_"+"PeriodName"] = copy[time_col_name+"_"+"Time"].apply(self.get_time_period_name)
+            copy[time_col_name+"_"+"period_name"] = copy[time_col_name+"_"+"military_time"].apply(self.get_time_period_name)
             
-            copy[time_col_name+"_"+"PeriodNum"] = copy[time_col_name+"_"+"Time"].apply(self.get_time_period_num)
+            copy[time_col_name+"_"+"period_num"] = copy[time_col_name+"_"+"military_time"].apply(self.get_time_period_num)
 
          
 
@@ -93,15 +93,21 @@ class TimeHandler(TransformerMixin,BaseEstimator):
 
 class DateHandler(TransformerMixin,BaseEstimator):
     """ Splits the date into day, month, year
-        Creates features such as day_name, is_weekend
+        Creates features such as day_name, day_num,is_weekend,close_to_month_start_end,is_holiday,quater
     """
-    def __init__(self,date_cols_names:list,return_whole_df:bool,drop_original_col = True):
+    def __init__(self,date_cols_names:list,return_whole_df = True,drop_original_col = True,date_format = "%Y/%m/%d",close_to_start_month_end_param = 5):
+        """
+        close_to_start_month_end_param: No. of days specifiying how close is a given date close to start, end of a month
+        Example: 2, for January, close dates will be 1st, 2nd, 30th and 31st January
+        """
         self.return_whole_df = return_whole_df
         self.cols = []
         self.date_cols_names = date_cols_names
-        self.added_cols_suffix = ["Day","Month","Year","Day_Name","Day_Num","is_weekend","Close_To_Month_Start_End","is_holiday","Quater"]
+        self.added_cols_suffix = ["day","month","year","day_name","day_num","is_weekend","close_to_month_start_end","is_holiday","quater"]
         self.added_cols = []
         self.drop_original_col = drop_original_col
+        self.date_format = date_format
+        self.close_to_start_month_end_param = close_to_start_month_end_param
 
 
     def fit(self,df,y=None):
@@ -115,26 +121,26 @@ class DateHandler(TransformerMixin,BaseEstimator):
     def transform(self,df,*_):
         copy = df.copy()
         for date_col_name in self.date_cols_names:
-            copy[date_col_name] = pd.to_datetime(copy[date_col_name],format="%Y/%m/%d")
+            copy[date_col_name] = pd.to_datetime(copy[date_col_name],format=self.date_format)
             temp = pd.DataFrame(index=copy.index)
             temp["Days_In_Month"] = copy[date_col_name].dt.days_in_month
             temp["last_day_minus_current"] = temp["Days_In_Month"] - copy[date_col_name].dt.day
             temp["current_minus_first_day"] = copy[date_col_name].dt.day - 1
             temp["First_Last_Few_Days_Of_Month"] = temp[["last_day_minus_current","current_minus_first_day"]].min(axis=1)
-            copy[date_col_name+"_"+"Close_To_Month_Start_End"] = np.where(temp["First_Last_Few_Days_Of_Month"]<=5,1,0)
+            copy[date_col_name+"_"+"close_to_month_start_end"] = np.where(temp["First_Last_Few_Days_Of_Month"]<=self.close_to_start_month_end_param,1,0)
             
 
-            copy[date_col_name+"_"+"Day"] = copy[date_col_name].dt.day
-            copy[date_col_name+"_"+"Month"] = copy[date_col_name].dt.month
-            copy[date_col_name+"_"+"Year"] = copy[date_col_name].dt.year
-            copy[date_col_name+"_"+"Day_Name"] = copy[date_col_name].dt.day_name()
-            copy[date_col_name+"_"+"Day_Num"] = copy[date_col_name].dt.weekday
+            copy[date_col_name+"_"+"day"] = copy[date_col_name].dt.day
+            copy[date_col_name+"_"+"month"] = copy[date_col_name].dt.month
+            copy[date_col_name+"_"+"year"] = copy[date_col_name].dt.year
+            copy[date_col_name+"_"+"day_name"] = copy[date_col_name].dt.day_name()
+            copy[date_col_name+"_"+"day_num"] = copy[date_col_name].dt.weekday
             
 
-            copy[date_col_name+"_"+"is_weekend"] = copy[date_col_name+"_"+"Day_Name"].isin(["Sunday","Saturday"]).map({True:1,False:0})
+            copy[date_col_name+"_"+"is_weekend"] = copy[date_col_name+"_"+"day_name"].isin(["Sunday","Saturday"]).map({True:1,False:0})
             
             copy[date_col_name+"_"+"is_holiday"] = copy[date_col_name].map(self.is_holiday)
-            copy[date_col_name+"_"+"Quater"] = copy[date_col_name].map(self.get_quater)
+            copy[date_col_name+"_"+"quater"] = copy[date_col_name].map(self.get_quater)
    
         if self.return_whole_df:
             return copy[self.cols+self.added_cols]
@@ -167,44 +173,72 @@ class DateHandler(TransformerMixin,BaseEstimator):
     
 
 class DateDiff(TransformerMixin,BaseEstimator):
-    def __init__(self,date_col):
+    """
+    Considering the earliest date as 1 transforms all dates and adds a feature (kind of reference pointer)
+    
+    """
+    
+    def __init__(self,date_cols_names:list,return_whole_df = True,drop_original_col = True,date_format = "%Y/%m/%d"):
         self.cols = []
-        self.date_col = date_col
-        self.date_diff_col = self.date_col + "DateDiff"
+        self.date_cols_names = date_cols_names
+        
+        self.return_whole_df = return_whole_df
+        self.drop_original_col = drop_original_col
+        self.date_format = date_format
+        
+        self.added_cols = []
+        self.first_dates = {}
 
     def fit(self,df,y=None):
         self.cols = list(df.columns)
-        self.cols.append(self.date_diff_col)
         
-        df[self.date_col] = pd.to_datetime(df[self.date_col])
-        self.first_date = df[self.date_col].sort_values()[0].date()
+        copy = df.copy()
+        for date_col_name in self.date_cols_names:
+            if self.drop_original_col:
+                self.cols.remove(date_col_name)
+            self.added_cols.append(date_col_name + "_date_diff")
+            
+            copy[date_col_name] = pd.to_datetime(copy[date_col_name],format=self.date_format)
+            first_date = copy[date_col_name].sort_values()[0].date()
+            self.first_dates[date_col_name] = first_date
+        
         
         return self
 
     def transform(self,df,*_):
-        df[self.date_diff_col] = df[self.date_col].map(lambda x: (x.date()-self.first_date).days)
-        return df
+        copy = df.copy()
+        for date_col_name in self.date_cols_names:
+            copy[date_col_name] = pd.to_datetime(copy[date_col_name],format=self.date_format)
+            copy[date_col_name+"_date_diff"] = copy[date_col_name].map(lambda x: (x.date()-self.first_dates.get(date_col_name)).days)
+        
+        if self.return_whole_df:
+            return copy[self.cols+self.added_cols]
+
+        if self.drop_original_col:
+            return copy[self.added_cols]
+    
+        return copy[self.date_cols_names + self.added_cols]
 
     def get_feature_names(self):
-        return self.cols
+        if self.return_whole_df:
+            return self.cols + self.added_cols
+
+        if self.drop_original_col:
+            return self.added_cols
+
+        return self.date_cols_names + self.added_cols
+
 
     
-class NullHandler(TransformerMixin,BaseEstimator):
+class NullPct(TransformerMixin,BaseEstimator):
     """
-        Adds a feature IsNull for all numeric columns
-        Imputes Numeric Null values using median strategy of SimpleImputer
-        Categorical Null values are replaced by "Null" representing a null category   
-        Adds a feature Null_Pct which is the % of nulls in the given row
-        Does not include columns ending with IsOutlier when calculating Null %
+        Adds a feature null_pct which is the % of nulls in the given row
+        Does not include columns ending with _is_outlier when calculating Null %
         Set exclude_cols_for_null_pct for excluding other columns if any
     """
     
     df = None
     cols = None
-    null_cols = []
-    null_num_cols = []
-    null_cat_cols = []
-    numeric_imputer = None
     
     def __init__(self,exclude_cols_for_null_pct=[]):
         """
@@ -216,54 +250,25 @@ class NullHandler(TransformerMixin,BaseEstimator):
     def fit(self,df,y=None):
         self.cols = list(df.columns)
         
-        self.numeric_imputer = SimpleImputer(strategy="median")
-        
-        self._infer_dtypes(df)
-        
-        self.numeric_imputer.fit(df.loc[:,self.null_num_cols])
-        
         return self
 
     def transform(self,df,*_):
         self.df = df.copy()
         
         self._null_pct()
-        self._numeric_is_null()
-        self._cat_null_cat()
-        self._numeric_impute_null()
             
         return self.df
     
-    def _numeric_impute_null(self):
-        self.df[self.null_num_cols] = self.numeric_imputer.transform(self.df.loc[:,self.null_num_cols]) 
-    
-    def _numeric_is_null(self):
-        for col in self.null_num_cols:
-            self.df[col+"IsNull"] = self.df[col].isnull()
-            
-                
-    def _cat_null_cat(self):
-        for col in self.null_cat_cols:
-            self.df.loc[self.df[self.df[col].isnull()].index.to_list(),col] = "Null"
     
     def _null_pct(self):
-        cols_to_include = [i for i in self.cols if not i.endswith("IsOutlier")]
+        cols_to_include = [i for i in self.cols if not i.endswith("_is_outlier")]
         cols_to_include = [i for i in cols_to_include if i not in self.exclude_cols_for_null_pct]
         
-        self.df["Null_Pct"] = np.round(self.df[cols_to_include].isnull().mean(axis=1) * 100,2)
+        self.df["null_pct"] = np.round(self.df[cols_to_include].isnull().mean(axis=1) * 100,2)
         
         
-    def _infer_dtypes(self,df):
-        self.null_cols = pd.DataFrame(df.isnull().sum(),columns=["Nulls"]).query("Nulls>0").index.to_list()
-        for col in self.null_cols:
-            dtype = df[col].dtype
-            if dtype in ["int","float"]:
-                self.null_num_cols.append(col)
-            else:
-                self.null_cat_cols.append(col)
-            
     def get_feature_names(self):
-        return list(self.cols) + ["Null_Pct"] +[i + "IsNull" for i in self.null_num_cols]
+        return list(self.cols) + ["null_pct"] 
     
     
 class OutlierHandler(TransformerMixin,BaseEstimator):
@@ -277,11 +282,12 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
     cols_gaussian_info = None # {col: True / False}
     boundaries = {} # {col: [lower,upper]}
     
-    def __init__(self,cols_gaussian_info={},gaussian_threshold=2,iqr_threshold=1.5):
+    def __init__(self,auto_infer_whether_guassian_dist=True, cols_gaussian_info={},gaussian_threshold=2,iqr_threshold=1.5):
         """
-            cols_gaussian_info : Pass column names and boolean value indicating whether the column follows a gaussian distribution or not.
+            auto_infer_whether_guassian_dist : Automaticaly infer whether the feature follows guassian distribution for each feature (cols_gaussian_info should be empty)
+            cols_gaussian_info : Pass column names and boolean value indicating whether the column follows a gaussian distribution or not (auto_infer_whether_guassian_dist should be False if this is not empty)
             Syntax: cols_guassian_info = {'col_A' : True, 'col_B' : False}
-            Default value for columns not passed is True (follows gaussina distribution)
+            Default value for columns not passed is True (follows gaussian distribution)
         
             Gaussian Threshold: Mean +- Std * threshold
             IQR Threshold: 75th percentile + IQR * threshold
@@ -289,8 +295,15 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
             Common Values for Gaussian Threshold: 2, 3
             Common Values for IQR Threshold: 1.5, 3
         """
-        
+        self.auto_infer_whether_guassian_dist = auto_infer_whether_guassian_dist
         self.cols_gaussian_info = cols_gaussian_info
+        
+        if self.auto_infer_whether_guassian_dist and self.cols_gaussian_info != {}:
+            raise Exception("Either auto_infer_whether_guassian_dist should be true and cols_gaussian_info should be empty\n or auto_infer_whether_guassian_dist should be false and cols_gaussian_info should be not empty")
+        
+        if (not self.auto_infer_whether_guassian_dist) and self.cols_gaussian_info == {}:
+            raise Exception("Either auto_infer_whether_guassian_dist should be true and cols_gaussian_info should be empty\n or auto_infer_whether_guassian_dist should be false and cols_gaussian_info should be not empty")
+        
         self.gaussian_threshold = gaussian_threshold
         self.iqr_threshold = iqr_threshold
     
@@ -302,9 +315,12 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
         self.numeric_cols = numeric.columns
         
         for col in self.numeric_cols:
-            info = self.cols_gaussian_info.get(col,True)
+            if self.auto_infer_whether_guassian_dist:
+                info = self._is_gaussian(numeric[col])
+            else:
+                info = self.cols_gaussian_info.get(col,True)
             if info:
-                # Followes Gaussian Distribution
+                # Follows Gaussian Distribution
                 bounds = self._get_gaussian_boundaries(df[col])
             else:
                 bounds = self._get_iqr_boundaries(df[col])
@@ -317,9 +333,15 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
         
         for col in self.numeric_cols:
             bounds = self.boundaries[col]
-            self.df[col+"IsOutlier"] = self.df[col].map(lambda x: x < bounds[0] or x > bounds[1])
+            self.df[col+"_is_outlier"] = self.df[col].map(lambda x: x < bounds[0] or x > bounds[1])
             
         return self.df
+    
+    def _is_gaussian(self,col):
+        stat, p = shapiro(col)
+        if p >= 0.05:
+            return True
+        return False
     
     def _get_gaussian_boundaries(self,col : pd.Series):
         mean = col.mean()
@@ -335,7 +357,7 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
         return [lower,upper]
             
     def get_feature_names(self):
-        return list(self.cols) + [i + "IsOutlier" for i in self.numeric_cols]
+        return list(self.cols) + [i + "_is_outlier" for i in self.numeric_cols]
     
 class PassThrough(TransformerMixin,BaseEstimator):
     def __init__(self):
