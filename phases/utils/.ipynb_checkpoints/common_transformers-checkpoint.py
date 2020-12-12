@@ -5,11 +5,24 @@ from scipy.stats import iqr, shapiro
 
 import holidays
 
-class TimeHandler(TransformerMixin,BaseEstimator):
+class Common:
+    def get_cols_needed(self,cols,include=None,exclude=None):
+        if include == None and exclude == None:
+            return cols
+        
+        if exclude == None:
+            return include
+        
+        if include == None:
+            return [col for col in cols if col not in exclude]
+        
+        raise Exception("Either specify include or exclude or None. Both cannot be specified")
+
+class TimeHandler(TransformerMixin,BaseEstimator,Common):
     """ Splits the time into hour, minute
         Creates features such as period, military_time
     """
-    def __init__(self,time_cols_names:list,return_whole_df= True,drop_original_col = True,time_format="%H:%M"):
+    def __init__(self,time_cols_names:list,return_whole_df= True,drop_original_col = True,time_format="%H:%M",include=None,exclude=None):
         self.return_whole_df = return_whole_df
         self.cols = []
         self.time_cols_names = time_cols_names
@@ -17,13 +30,17 @@ class TimeHandler(TransformerMixin,BaseEstimator):
         self.added_cols = []
         self.drop_original_col = drop_original_col
         self.time_format = time_format
+        self.include = include
+        self.exclude = exclude
 
     def fit(self,df,y=None):
         self.cols = list(df.columns)
+        self.included_cols = self.get_cols_needed(self.added_cols_suffix,self.include,self.exclude)
         for time_col_name in self.time_cols_names:
             if self.drop_original_col:
                 self.cols.remove(time_col_name)
-            self.added_cols.extend([time_col_name + "_" + i for i in self.added_cols_suffix])
+            self.added_cols.extend([time_col_name + "_" + i for i in self.added_cols_suffix if i in self.included_cols])
+        
         return self
 
 
@@ -64,18 +81,35 @@ class TimeHandler(TransformerMixin,BaseEstimator):
         for time_col_name in self.time_cols_names:
             copy[time_col_name] = pd.to_datetime(copy[time_col_name],format=self.time_format)
 
-            copy[time_col_name+"_"+"hour"] = copy[time_col_name].dt.hour
-            copy[time_col_name+"_"+"minute"] = copy[time_col_name].dt.minute
-            # Military Time
-            copy[time_col_name+"_"+"military_time"] = (copy[time_col_name+"_"+"hour"].astype(str) + copy[time_col_name+"_"+"minute"].astype(str)).astype(int)
-
-            # Time Period
-            copy[time_col_name+"_"+"period_name"] = copy[time_col_name+"_"+"military_time"].apply(self.get_time_period_name)
+            if "period_name" in self.included_cols or "period_num" in self.included_cols:
             
-            copy[time_col_name+"_"+"period_num"] = copy[time_col_name+"_"+"military_time"].apply(self.get_time_period_num)
-
-         
-
+                copy[time_col_name+"_hour"] = copy[time_col_name].dt.hour
+                copy[time_col_name+"_minute"] = copy[time_col_name].dt.minute
+                
+                # Military Time
+                copy[time_col_name+"_military_time"] = (copy[time_col_name+"_hour"].astype(str) + copy[time_col_name+"_minute"].astype(str)).astype(int)
+                
+                if "period_name" in self.included_cols:
+                    # Time Period
+                    copy[time_col_name+"_period_name"] = copy[time_col_name+"_military_time"].apply(self.get_time_period_name)
+                
+                if "period_num" in self.included_cols:
+                    copy[time_col_name+"_period_num"] = copy[time_col_name+"_military_time"].apply(self.get_time_period_num)
+                
+                if "military_time" not in self.included_cols:
+                    copy.drop(time_col_name+"_military_time",axis=1,inplace=True)
+            
+            else:
+                if "hour" in self.included_cols:
+                    copy[time_col_name+"_hour"] = copy[time_col_name].dt.hour
+                    
+                if "minute" in self.included_cols:
+                    copy[time_col_name+"_minute"] = copy[time_col_name].dt.minute
+                
+                if "military_time" in self.included_cols:
+                    copy[time_col_name+"_military_time"] = (copy[time_col_name+"_hour"].astype(str) + copy[time_col_name+"_minute"].astype(str)).astype(int)
+            
+            
 
         if self.return_whole_df:
             return copy[self.cols+self.added_cols]
@@ -91,11 +125,11 @@ class TimeHandler(TransformerMixin,BaseEstimator):
         return self.added_cols
 
 
-class DateHandler(TransformerMixin,BaseEstimator):
+class DateHandler(TransformerMixin,BaseEstimator,Common):
     """ Splits the date into day, month, year
         Creates features such as day_name, day_num,is_weekend,close_to_month_start_end,is_holiday,quater
     """
-    def __init__(self,date_cols_names:list,return_whole_df = True,drop_original_col = True,date_format = "%Y/%m/%d",close_to_start_month_end_param = 5):
+    def __init__(self,date_cols_names:list,return_whole_df = True,drop_original_col = True,date_format = "%Y/%m/%d",close_to_start_month_end_param = 5,include=None,exclude=None):
         """
         close_to_start_month_end_param: No. of days specifiying how close is a given date close to start, end of a month
         Example: 2, for January, close dates will be 1st, 2nd, 30th and 31st January
@@ -108,39 +142,55 @@ class DateHandler(TransformerMixin,BaseEstimator):
         self.drop_original_col = drop_original_col
         self.date_format = date_format
         self.close_to_start_month_end_param = close_to_start_month_end_param
+        self.include = include
+        self.exclude = exclude
 
 
     def fit(self,df,y=None):
         self.cols = list(df.columns)
+        self.included_cols = self.get_cols_needed(self.added_cols_suffix,self.include,self.exclude)
         for date_col_name in self.date_cols_names:
             if self.drop_original_col:
                 self.cols.remove(date_col_name)
-            self.added_cols.extend([date_col_name + "_" + i for i in self.added_cols_suffix])
+            self.added_cols.extend([date_col_name + "_" + i for i in self.added_cols_suffix if i in self.included_cols])
         return self
 
     def transform(self,df,*_):
         copy = df.copy()
         for date_col_name in self.date_cols_names:
             copy[date_col_name] = pd.to_datetime(copy[date_col_name],format=self.date_format)
-            temp = pd.DataFrame(index=copy.index)
-            temp["Days_In_Month"] = copy[date_col_name].dt.days_in_month
-            temp["last_day_minus_current"] = temp["Days_In_Month"] - copy[date_col_name].dt.day
-            temp["current_minus_first_day"] = copy[date_col_name].dt.day - 1
-            temp["First_Last_Few_Days_Of_Month"] = temp[["last_day_minus_current","current_minus_first_day"]].min(axis=1)
-            copy[date_col_name+"_"+"close_to_month_start_end"] = np.where(temp["First_Last_Few_Days_Of_Month"]<=self.close_to_start_month_end_param,1,0)
             
-
-            copy[date_col_name+"_"+"day"] = copy[date_col_name].dt.day
-            copy[date_col_name+"_"+"month"] = copy[date_col_name].dt.month
-            copy[date_col_name+"_"+"year"] = copy[date_col_name].dt.year
-            copy[date_col_name+"_"+"day_name"] = copy[date_col_name].dt.day_name()
-            copy[date_col_name+"_"+"day_num"] = copy[date_col_name].dt.weekday
+            if "close_to_month_start_end" in self.included_cols:
+                temp = pd.DataFrame(index=copy.index)
+                temp["Days_In_Month"] = copy[date_col_name].dt.days_in_month
+                temp["last_day_minus_current"] = temp["Days_In_Month"] - copy[date_col_name].dt.day
+                temp["current_minus_first_day"] = copy[date_col_name].dt.day - 1
+                temp["First_Last_Few_Days_Of_Month"] = temp[["last_day_minus_current","current_minus_first_day"]].min(axis=1)
+                copy[date_col_name+"_close_to_month_start_end"] = np.where(temp["First_Last_Few_Days_Of_Month"]<=self.close_to_start_month_end_param,1,0)
             
-
-            copy[date_col_name+"_"+"is_weekend"] = copy[date_col_name+"_"+"day_name"].isin(["Sunday","Saturday"]).map({True:1,False:0})
-            
-            copy[date_col_name+"_"+"is_holiday"] = copy[date_col_name].map(self.is_holiday)
-            copy[date_col_name+"_"+"quater"] = copy[date_col_name].map(self.get_quater)
+            if "day" in self.included_cols:
+                copy[date_col_name+"_day"] = copy[date_col_name].dt.day
+                
+            if "month" in self.included_cols:    
+                copy[date_col_name+"_month"] = copy[date_col_name].dt.month
+                
+            if "year" in self.included_cols:
+                copy[date_col_name+"_year"] = copy[date_col_name].dt.year
+                
+            if "day_name" in self.included_cols:
+                copy[date_col_name+"_day_name"] = copy[date_col_name].dt.day_name()
+                
+            if "day_num" in self.included_cols:
+                copy[date_col_name+"_day_num"] = copy[date_col_name].dt.weekday
+                
+            if "is_weekend" in self.included_cols:
+                copy[date_col_name+"_is_weekend"] = copy[date_col_name].dt.day_name().isin(["Sunday","Saturday"]).map({True:1,False:0})
+                
+            if "is_holiday" in self.included_cols:
+                copy[date_col_name+"_is_holiday"] = copy[date_col_name].map(self.is_holiday)
+                
+            if "quater" in self.included_cols:
+                copy[date_col_name+"_quater"] = copy[date_col_name].map(self.get_quater)
    
         if self.return_whole_df:
             return copy[self.cols+self.added_cols]
