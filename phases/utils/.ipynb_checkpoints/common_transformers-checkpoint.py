@@ -277,6 +277,9 @@ class DateDiff(TransformerMixin,BaseEstimator):
             return self.added_cols
 
         return self.date_cols_names + self.added_cols
+    
+
+
 
 
     
@@ -320,8 +323,43 @@ class NullPct(TransformerMixin,BaseEstimator):
     def get_feature_names(self):
         return list(self.cols) + ["null_pct"] 
     
+
+class IsNull(TransformerMixin,BaseEstimator,Common):
+    def __init__(self,return_whole_df= True,drop_original_col = True,include=None,exclude=None):
+        """
+        Column null_pct and all columns ending with _is_outlier are excluded
+        """
+        self.return_whole_df = return_whole_df
+        self.drop_original_col = drop_original_col
+        self.include = include
+        self.exclude = exclude
+        
+    def fit(self,df,y=None):
+        self.cols = list(df.columns)
+        self.included_cols = self.get_cols_needed(self.cols,self.include,self.exclude)
+        self.included_cols = [i for i in self.included_cols if not i.endswith("_is_outlier") and i!="null_pct"]
+        self.added_cols = [i + "_is_null" for i in self.included_cols]
+        
+        return self
     
-class OutlierHandler(TransformerMixin,BaseEstimator):
+    def transform(self,df,*_):
+        copy = df.copy()
+        copy[self.added_cols] = df[self.included_cols].isnull()
+        
+        if self.return_whole_df:
+            return copy[self.cols+self.added_cols]
+
+        if self.drop_original_col:
+            return copy[self.added_cols]
+
+        return copy[self.time_cols_names + self.added_cols]
+    
+    def get_feature_names(self):
+        if self.return_whole_df:
+            return self.cols + self.added_cols
+        return self.added_cols
+    
+class OutlierHandler(TransformerMixin,BaseEstimator, Common):
     """
         Adds a feature IsOutlier for all numeric columns
         Outlier is identified either by using standard deviation or
@@ -332,7 +370,7 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
     cols_gaussian_info = None # {col: True / False}
     boundaries = {} # {col: [lower,upper]}
     
-    def __init__(self,auto_infer_whether_guassian_dist=True, cols_gaussian_info={},gaussian_threshold=2,iqr_threshold=1.5):
+    def __init__(self,auto_infer_whether_guassian_dist=True, cols_gaussian_info={},gaussian_threshold=2,iqr_threshold=1.5,include=None,exclude=None):
         """
             auto_infer_whether_guassian_dist : Automaticaly infer whether the feature follows guassian distribution for each feature (cols_gaussian_info should be empty)
             cols_gaussian_info : Pass column names and boolean value indicating whether the column follows a gaussian distribution or not (auto_infer_whether_guassian_dist should be False if this is not empty)
@@ -356,6 +394,9 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
         
         self.gaussian_threshold = gaussian_threshold
         self.iqr_threshold = iqr_threshold
+        
+        self.include = include
+        self.exclude = exclude
     
     
     def fit(self,df,y=None):
@@ -363,8 +404,9 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
         
         numeric = df.select_dtypes(include=np.number)
         self.numeric_cols = numeric.columns
+        self.included_cols = self.get_cols_needed(self.numeric_cols,self.include,self.exclude)
         
-        for col in self.numeric_cols:
+        for col in self.included_cols:
             if self.auto_infer_whether_guassian_dist:
                 info = self._is_gaussian(numeric[col])
             else:
@@ -381,7 +423,7 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
     def transform(self,df,*_):
         self.df = df.copy()
         
-        for col in self.numeric_cols:
+        for col in self.included_cols:
             bounds = self.boundaries[col]
             self.df[col+"_is_outlier"] = self.df[col].map(lambda x: x < bounds[0] or x > bounds[1])
             
@@ -407,7 +449,7 @@ class OutlierHandler(TransformerMixin,BaseEstimator):
         return [lower,upper]
             
     def get_feature_names(self):
-        return list(self.cols) + [i + "_is_outlier" for i in self.numeric_cols]
+        return list(self.cols) + [i + "_is_outlier" for i in self.included_cols]
     
 class PassThrough(TransformerMixin,BaseEstimator):
     def __init__(self):
