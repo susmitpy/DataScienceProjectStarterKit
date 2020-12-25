@@ -249,7 +249,7 @@ class DateDiff(TransformerMixin,BaseEstimator):
             self.added_cols.append(date_col_name + "_date_diff")
             
             copy[date_col_name] = pd.to_datetime(copy[date_col_name],format=self.date_format)
-            first_date = copy[date_col_name].sort_values()[0].date()
+            first_date = copy[date_col_name].sort_values().iloc[0].date()
             self.first_dates[date_col_name] = first_date
         
         
@@ -402,7 +402,7 @@ class OutlierHandler(TransformerMixin,BaseEstimator, Common):
     def fit(self,df,y=None):
         self.cols = list(df.columns)  
         
-        numeric = df.select_dtypes(include=np.number)
+        numeric = df.select_dtypes(include=[int,float],exclude=[bool])
         self.numeric_cols = numeric.columns
         self.included_cols = self.get_cols_needed(self.numeric_cols,self.include,self.exclude)
         
