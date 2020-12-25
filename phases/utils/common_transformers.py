@@ -184,7 +184,7 @@ class DateHandler(TransformerMixin,BaseEstimator,Common):
                 copy[date_col_name+"_day_num"] = copy[date_col_name].dt.weekday
                 
             if "is_weekend" in self.included_cols:
-                copy[date_col_name+"_is_weekend"] = copy[date_col_name].dt.day_name().isin(["Sunday","Saturday"]).map({True:1,False:0})
+                copy[date_col_name+"_is_weekend"] = copy[date_col_name].dt.day_name().isin(["Sunday","Saturday"])
                 
             if "is_holiday" in self.included_cols:
                 copy[date_col_name+"_is_holiday"] = copy[date_col_name].map(self.is_holiday)
@@ -450,6 +450,52 @@ class OutlierHandler(TransformerMixin,BaseEstimator, Common):
             
     def get_feature_names(self):
         return list(self.cols) + [i + "_is_outlier" for i in self.included_cols]
+    
+class DTypeTransformer(TransformerMixin,BaseEstimator):
+    """
+        Converts columns as per the given dtypes
+    """
+    def __init__(self, mapping={}):
+        """
+        Specify the dtype of column(s) you want to convert to\n
+        possible values are : int64, float64, bool, category, dt_fmt
+        dt_fmt : convert to datetime where fmt represents the format to parse
+        """
+        self.mapping = mapping
+
+    def fit(self,df,y=None):
+        self.cols = list(df.columns)
+        return self
+
+    def transform(self,df,*_):
+        copy = df.copy()
+        
+        for col,dtype in self.mapping.items():
+            if dtype == "int64":
+                copy[col] = copy[col].astype(np.int64)
+            
+            elif dtype == "float64":
+                copy[col] = copy[col].astype(np.float64)
+                
+            elif dtype == "bool":
+                copy[col] = copy[col].astype(bool)
+            
+            elif dtype == "category":
+                copy[col] = pd.Categorical(copy[col])
+            
+            elif dtype.startswith("dt_"):
+                fmt = dtype[3:]
+                copy[col] = pd.to_datetime(copy[col],format=fmt)
+            
+            else:
+                raise Exception("Unsupported dtype specified")
+                
+        
+        return copy
+    
+
+    def get_feature_names(self):
+        return self.cols
     
 class PassThrough(TransformerMixin,BaseEstimator):
     def __init__(self):
