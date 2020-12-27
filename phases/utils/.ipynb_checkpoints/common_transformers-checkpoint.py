@@ -166,7 +166,7 @@ class DateHandler(TransformerMixin,BaseEstimator,Common):
                 temp["last_day_minus_current"] = temp["Days_In_Month"] - copy[date_col_name].dt.day
                 temp["current_minus_first_day"] = copy[date_col_name].dt.day - 1
                 temp["First_Last_Few_Days_Of_Month"] = temp[["last_day_minus_current","current_minus_first_day"]].min(axis=1)
-                copy[date_col_name+"_close_to_month_start_end"] = np.where(temp["First_Last_Few_Days_Of_Month"]<=self.close_to_start_month_end_param,1,0)
+                copy[date_col_name+"_close_to_month_start_end"] = np.where(temp["First_Last_Few_Days_Of_Month"]<=self.close_to_start_month_end_param,True,False)
             
             if "day" in self.included_cols:
                 copy[date_col_name+"_day"] = copy[date_col_name].dt.day
@@ -347,12 +347,19 @@ class IsNull(TransformerMixin,BaseEstimator,Common):
         copy[self.added_cols] = df[self.included_cols].isnull()
         
         if self.return_whole_df:
+            if self.drop_original_col:
+                a = self.cols.copy()
+                for i in self.included_cols:
+                    a.remove(i)
+                
+                return copy[a+self.added_cols]
+            
             return copy[self.cols+self.added_cols]
 
         if self.drop_original_col:
             return copy[self.added_cols]
 
-        return copy[self.time_cols_names + self.added_cols]
+        return copy[self.included_cols + self.added_cols]
     
     def get_feature_names(self):
         if self.return_whole_df:
