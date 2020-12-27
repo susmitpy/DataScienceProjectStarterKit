@@ -17,6 +17,23 @@ class Common:
             return [col for col in cols if col not in exclude]
         
         raise Exception("Either specify include or exclude or None. Both cannot be specified")
+        
+    def return_transformed_df(self,df,return_whole_df,drop_original_col,cols,added_cols,processed_cols):
+        cols = set(cols)
+        cols_to_remove = set(processed_cols)
+        
+        if return_whole_df:
+            
+            if drop_original_col:
+                cols_to_include = list(cols.difference(processed_cols))
+                return df[cols_to_include + added_cols]
+            
+            return df[list(cols) + added_cols]
+        
+        if drop_original_col:
+            return df[added_cols]
+        
+        return df[processed_cols + added_cols]
 
 class TimeHandler(TransformerMixin,BaseEstimator,Common):
     """ Splits the time into hour, minute
@@ -109,15 +126,8 @@ class TimeHandler(TransformerMixin,BaseEstimator,Common):
                 if "military_time" in self.included_cols:
                     copy[time_col_name+"_military_time"] = (copy[time_col_name+"_hour"].astype(str) + copy[time_col_name+"_minute"].astype(str)).astype(int)
             
-            
-
-        if self.return_whole_df:
-            return copy[self.cols+self.added_cols]
-
-        if self.drop_original_col:
-            return copy[self.added_cols]
-
-        return copy[self.time_cols_names + self.added_cols]
+        
+        return self.return_transformed_df(copy,self.return_whole_df,self.drop_original_col,self.cols,self.added_cols,self.time_cols_names)
 
     def get_feature_names(self):
         if self.return_whole_df:
@@ -192,13 +202,7 @@ class DateHandler(TransformerMixin,BaseEstimator,Common):
             if "quater" in self.included_cols:
                 copy[date_col_name+"_quater"] = copy[date_col_name].map(self.get_quater)
    
-        if self.return_whole_df:
-            return copy[self.cols+self.added_cols]
-
-        if self.drop_original_col:
-            return copy[self.added_cols]
-
-        return copy[self.date_cols_names + self.added_cols]
+        return self.return_transformed_df(copy,self.return_whole_df,self.drop_original_col,self.cols,self.added_cols,self.date_cols_names)
 
     def is_holiday(self,date):
         return date in holidays.India(years=date.year)
@@ -222,7 +226,7 @@ class DateHandler(TransformerMixin,BaseEstimator,Common):
         return self.date_cols_names + self.added_cols
     
 
-class DateDiff(TransformerMixin,BaseEstimator):
+class DateDiff(TransformerMixin,BaseEstimator,Common):
     """
     Considering the earliest date as 1 transforms all dates and adds a feature (kind of reference pointer)
     
@@ -261,13 +265,7 @@ class DateDiff(TransformerMixin,BaseEstimator):
             copy[date_col_name] = pd.to_datetime(copy[date_col_name],format=self.date_format)
             copy[date_col_name+"_date_diff"] = copy[date_col_name].map(lambda x: (x.date()-self.first_dates.get(date_col_name)).days)
         
-        if self.return_whole_df:
-            return copy[self.cols+self.added_cols]
-
-        if self.drop_original_col:
-            return copy[self.added_cols]
-    
-        return copy[self.date_cols_names + self.added_cols]
+        return self.return_transformed_df(copy,self.return_whole_df,self.drop_original_col,self.cols,self.added_cols,self.date_cols_names)
 
     def get_feature_names(self):
         if self.return_whole_df:
@@ -278,10 +276,6 @@ class DateDiff(TransformerMixin,BaseEstimator):
 
         return self.date_cols_names + self.added_cols
     
-
-
-
-
     
 class NullPct(TransformerMixin,BaseEstimator):
     """
@@ -346,21 +340,8 @@ class IsNull(TransformerMixin,BaseEstimator,Common):
         copy = df.copy()
         copy[self.added_cols] = df[self.included_cols].isnull()
         
-        if self.return_whole_df:
-            if self.drop_original_col:
-                a = self.cols.copy()
-                for i in self.included_cols:
-                    a.remove(i)
-                
-                return copy[a+self.added_cols]
-            
-            return copy[self.cols+self.added_cols]
-
-        if self.drop_original_col:
-            return copy[self.added_cols]
-
-        return copy[self.included_cols + self.added_cols]
-    
+        return self.return_transformed_df(copy,self.return_whole_df,self.drop_original_col,self.cols,self.added_cols,self.included_cols)
+        
     def get_feature_names(self):
         if self.return_whole_df:
             return self.cols + self.added_cols
@@ -497,7 +478,6 @@ class DTypeTransformer(TransformerMixin,BaseEstimator):
             else:
                 raise Exception("Unsupported dtype specified")
                 
-        
         return copy
     
 
