@@ -1,4 +1,5 @@
 from IPython.display import display_html
+import re
 
 def display_side_by_side(mssg=None,*args):
     html_str=''
@@ -10,3 +11,10 @@ def display_side_by_side(mssg=None,*args):
         
         
     display_html(html_str.replace('table','table style="display:inline;padding:12px;margin:6px;padding-top:10px;"'),raw=True)
+
+def get_original_column_names(cols):
+    """
+    Given column names returned by ColumnTransformer returns original column names
+    """
+    pattern = r"([a-zA-Z]__)(.+)"
+    return [re.search(pattern,i).groups()[-1] for i in cols]

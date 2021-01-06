@@ -347,7 +347,7 @@ class IsNull(TransformerMixin,BaseEstimator,Common):
             return self.cols + self.added_cols
         return self.added_cols
     
-class OutlierHandler(TransformerMixin,BaseEstimator, Common):
+class OutlierDetector(TransformerMixin,BaseEstimator, Common):
     """
         Adds a feature IsOutlier for all numeric columns
         Outlier is identified either by using standard deviation or
@@ -503,15 +503,16 @@ class Dropper(TransformerMixin,BaseEstimator):
         self.cols_to_drop = cols_to_drop
 
     def fit(self,df,y=None):
+        self.cols = list(df.columns)
         return self
 
     def transform(self,df,*_):
         return df.drop(self.cols_to_drop,axis=1)
 
     def get_feature_names(self):
-        return self.cols
+        return list(set(self.cols).difference(set(self.cols_to_drop)))
     
-class FeatureSelector(BaseEstimator, TransformerMixin):
+class ColumnSelector(BaseEstimator, TransformerMixin):
 
     def __init__(self, feature_names):
         self._feature_names = feature_names 
@@ -521,3 +522,19 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y = None):
         return X[self._feature_names]
+    
+
+class ColumnNameApplyer(TransformerMixin,BaseEstimator):
+    def __init__(self,column_names):
+        self.column_names=column_names
+        
+
+    def fit(self,df,y=None):
+        return self
+
+    def transform(self,X,*_):
+        copy = pd.DataFrame(X,columns=self.column_names)
+        return copy
+
+    def get_feature_names(self):
+        return self.column_names
