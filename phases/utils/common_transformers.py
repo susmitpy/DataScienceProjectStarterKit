@@ -446,7 +446,7 @@ class DTypeTransformer(TransformerMixin,BaseEstimator):
     def __init__(self, mapping={}):
         """
         Specify the dtype of column(s) you want to convert to\n
-        possible values are : int64, float64, bool, category, dt_fmt
+        possible values are : int64, float64, bool, category, dt_fmt, str
         dt_fmt : convert to datetime where fmt represents the format to parse
         """
         self.mapping = mapping
@@ -470,6 +470,9 @@ class DTypeTransformer(TransformerMixin,BaseEstimator):
             
             elif dtype == "category":
                 copy[col] = pd.Categorical(copy[col])
+                
+            elif dtype == "str":
+                copy[col] = copy[col].astype(str)
             
             elif dtype.startswith("dt_"):
                 fmt = dtype[3:]

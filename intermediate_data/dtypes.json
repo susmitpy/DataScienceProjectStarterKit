@@ -1,1 +1,0 @@
-{"purchased": "bool", "added_in_cart": "bool", "checked_out": "bool", "date": "dt_%Y-%m-%d", "time_spent_is_outlier": "bool", "client_agent_is_null": "bool"}
