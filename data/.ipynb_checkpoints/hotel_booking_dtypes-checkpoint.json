@@ -1,0 +1,1 @@
+{"hotel": "category", "is_canceled": "bool", "arrival_date_year": "category", "arrival_date_month": "int64", "meal": "category", "is_repeated_guest": "bool", "arrival_date_week_number": "int64"}
