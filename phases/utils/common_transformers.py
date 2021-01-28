@@ -35,79 +35,79 @@ class Common:
         
         return df[processed_cols + added_cols]
     
-class CommonOrdinalEncoder(TransformerMixin,BaseEstimator):
-    def __init__(self):
-        self.mapping = {}
-        self.cols=[]
+# class CommonOrdinalEncoder(TransformerMixin,BaseEstimator):
+#     def __init__(self):
+#         self.mapping = {}
+#         self.cols=[]
 
-    def fit(self,df,y=None):
-        self.cols=df.columns
-        i = 0
-        for col in self.cols:
-            self.mapping[col] = {}
-            for unique_value in list(df[col].unique()):
-                self.mapping[col][unique_value] = i
-                i += 1
-            i = 0
-        return self
+#     def fit(self,df,y=None):
+#         self.cols=df.columns
+#         i = 0
+#         for col in self.cols:
+#             self.mapping[col] = {}
+#             for unique_value in list(df[col].unique()):
+#                 self.mapping[col][unique_value] = i
+#                 i += 1
+#             i = 0
+#         return self
     
-    def apply_mapping(self,col_value,col_name):
-        return int(self.mapping[col_name].get(col_value,-1))
+#     def apply_mapping(self,col_value,col_name):
+#         return int(self.mapping[col_name].get(col_value,-1))
     
-    def transform(self,df,*_):
-        copy = df.copy()
-        for col in self.cols:
-            copy[col] = df[col].apply(self.apply_mapping,args=[col])
-            copy[col] = pd.Categorical(copy[col])
+#     def transform(self,df,*_):
+#         copy = df.copy()
+#         for col in self.cols:
+#             copy[col] = df[col].apply(self.apply_mapping,args=[col])
+#             copy[col] = pd.Categorical(copy[col])
 
-        return copy[self.cols]
+#         return copy[self.cols]
     
-    def get_feature_names(self):
-        return self.cols
+#     def get_feature_names(self):
+#         return self.cols
 
 
-class CommonOHE(TransformerMixin,BaseEstimator,Common):
-    def __init__(self,cols,return_whole_df= True,drop_original_col = True):
-        self.return_whole_df = return_whole_df
-        self.drop_original_col = drop_original_col
-        self.df_data = {}
-        self.cols = {}
-        self.enc_cols = cols
+# class CommonOHE(TransformerMixin,BaseEstimator,Common):
+#     def __init__(self,cols,return_whole_df= True,drop_original_col = True):
+#         self.return_whole_df = return_whole_df
+#         self.drop_original_col = drop_original_col
+#         self.df_data = {}
+#         self.cols = {}
+#         self.enc_cols = cols
         
-    def fit(self,df,y=None):
-        self.df_data = {}
-        self.cols = {}
-        for col in self.enc_cols:
-            for unique_value in list(df[col].unique())[:-1]:
-                self.df_data[f"{col}_{unique_value}"] = []
-                self.cols[f"{col}_{unique_value}"] = True
+#     def fit(self,df,y=None):
+#         self.df_data = {}
+#         self.cols = {}
+#         for col in self.enc_cols:
+#             for unique_value in list(df[col].unique())[:-1]:
+#                 self.df_data[f"{col}_{unique_value}"] = []
+#                 self.cols[f"{col}_{unique_value}"] = True
                 
-        return self
+#         return self
     
-    def apply_mapping(self,col_value,col_name):
-        col = f"{col_name}_{col_value}"
-        for k in list(self.cols.keys()):
-            if k.split("_")[0] != col_name:
-                continue
-            if k == col:
-                self.df_data[k].append(1)
-            else:
-                self.df_data[k].append(0)
-        return col_value
+#     def apply_mapping(self,col_value,col_name):
+#         col = f"{col_name}_{col_value}"
+#         for k in list(self.cols.keys()):
+#             if k.split("_")[0] != col_name:
+#                 continue
+#             if k == col:
+#                 self.df_data[k].append(1)
+#             else:
+#                 self.df_data[k].append(0)
+#         return col_value
     
-    def transform(self,df,*_):
-        copy = df.copy()
-        for col in self.enc_cols:
-            df[col].apply(self.apply_mapping,args=[col])
-            copy.drop(col,axis=1,inplace=True)
+#     def transform(self,df,*_):
+#         copy = df.copy()
+#         for col in self.enc_cols:
+#             df[col].apply(self.apply_mapping,args=[col])
+#             copy.drop(col,axis=1,inplace=True)
         
-        return self.return_transformed_df(self.)
-        if self.return_whole_df:
-            return copy.join(pd.DataFrame(self.df_data,index=df.index))
-        return pd.DataFrame(self.df_data,index=df.index)
+#         return self.return_transformed_df(self.)
+#         if self.return_whole_df:
+#             return copy.join(pd.DataFrame(self.df_data,index=df.index))
+#         return pd.DataFrame(self.df_data,index=df.index)
     
-    def get_feature_names(self):
-        return self.cols
+#     def get_feature_names(self):
+#         return self.cols
 
 class TimeHandler(TransformerMixin,BaseEstimator,Common):
     """ Splits the time into hour, minute
@@ -513,6 +513,33 @@ class OutlierDetector(TransformerMixin,BaseEstimator, Common):
     def get_feature_names(self):
         return list(self.cols) + [i + "_is_outlier" for i in self.included_cols]
     
+class OutlierImputer(TransformerMixin,BaseEstimator):
+    """
+        Imputes outliers by the value specified for each column
+        For each column, a feature named featureName_is_outlier must be present in the dataframe passed
+    """
+    def __init__(self,impute_values = {}):
+        """
+            impute_values = {column_name : impute_value}
+        """
+        self.impute_values=impute_values
+        self.column_names = []
+
+    def fit(self,df,y=None):
+        self.column_names = list(df.columns)
+        return self
+
+    def transform(self,df,*_):
+        copy = df.copy()
+        
+        for col,impute_value in self.impute_values.items():
+            copy.loc[df[col+"_is_outlier"]==True,col] = impute_value
+        
+        return copy
+
+    def get_feature_names(self):
+        return self.column_names
+    
 class DTypeTransformer(TransformerMixin,BaseEstimator):
     """
         Converts columns as per the given dtypes
@@ -560,6 +587,19 @@ class DTypeTransformer(TransformerMixin,BaseEstimator):
 
     def get_feature_names(self):
         return self.cols
+    
+    @staticmethod
+    def get_mapping_from_map_of_lists(ints=[],floats=[],bools=[],cats=[],strs=[]):
+        """
+            Returns a mapping of dtypes generated using the column names passed in the dtypes lists
+        """
+        mapping = {}
+        
+        for cols,dtype in zip([ints,floats,bools,cats,strs],["int64","float64","bool","category","str"]):
+            mapping.update({col:dtype for col in cols})
+        
+        return mapping
+        
     
 class PassThrough(TransformerMixin,BaseEstimator):
     def __init__(self):

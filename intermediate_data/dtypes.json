@@ -1,0 +1,1 @@
+{"Parch_is_outlier": "bool", "Fare_is_outlier": "bool", "Age_is_outlier": "bool", "SibSp_is_outlier": "bool", "Survived": "bool", "Age_is_null": "bool", "Cabin_is_null": "bool", "Embarked_is_null": "bool", "Sex": "category", "Pclass": "category", "Embarked": "category", "Parch": "category", "SibSp": "category"}
