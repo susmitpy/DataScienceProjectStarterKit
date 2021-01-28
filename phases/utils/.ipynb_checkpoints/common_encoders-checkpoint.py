@@ -36,6 +36,7 @@ class CommonOHE(TransformerMixin,BaseEstimator):
     def __init__(self,cols):
         self.df_data = {}
         self.cols = {}
+        self.enc_cols = cols
         
     def fit(self,df,y=None):
         self.df_data = {}
@@ -66,5 +67,8 @@ class CommonOHE(TransformerMixin,BaseEstimator):
         if self.return_whole_df:
             return copy.join(pd.DataFrame(self.df_data,index=df.index))
         return pd.DataFrame(self.df_data,index=df.index)
+    
+    def get_feature_names(self):
+        return self.cols
 
         
