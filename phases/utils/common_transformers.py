@@ -110,10 +110,24 @@ class Common:
 #         return self.cols
 
 class TimeHandler(TransformerMixin,BaseEstimator,Common):
-    """ Splits the time into hour, minute
-        Creates features such as period, military_time
+    """ Splits the time and
+        Creates features such as
+        hour : 0 - 23
+        minute : 0-59
+        period_name : Morning, Afternoon, Evening, Night
+        period_num : 1,2,3,4
+        military_time : 0000 to 2359 
     """
     def __init__(self,time_cols_names:list,return_whole_df= True,drop_original_col = True,time_format="%H:%M",include=None,exclude=None):
+        """
+            time_cols_names : column names having time
+            time_format : the time format (strpformat)
+            include : features names to be generated
+            exclude : feature names to be excluded while generating all features
+            return_whole_df : whether to to return the whole dataframe
+            drop_original_col : whether to drop the columns using which processing is done
+        """
+        
         self.return_whole_df = return_whole_df
         self.cols = []
         self.time_cols_names = time_cols_names
@@ -210,14 +224,32 @@ class TimeHandler(TransformerMixin,BaseEstimator,Common):
 
 
 class DateHandler(TransformerMixin,BaseEstimator,Common):
-    """ Splits the date into day, month, year
-        Creates features such as day_name, day_num,is_weekend,close_to_month_start_end,is_holiday,quater
+    """ 
+        Splits the date and
+        Creates features such as
+        day : 1 - 131
+        month : 1 - 12
+        year : the year
+        day_name : Monday to Sunday
+        day_num : 0 to 6
+        quater : Quater of the year decided by month
+        is_weekend : Whether there is a weekend for given date
+        is_holiday : Whether there is a holiday for given date for country specified (holidays (https://pypi.org/project/holidays/) library is used)
+        close_to_start_month_end : Boolean indicating whether the date is close to month's start or end (True means close)
     """
-    def __init__(self,date_cols_names:list,return_whole_df = True,drop_original_col = True,date_format = "%Y/%m/%d",close_to_start_month_end_param = 5,include=None,exclude=None):
+
+    def __init__(self,date_cols_names:list,return_whole_df = True,drop_original_col = True,date_format = "%Y/%m/%d",close_to_start_month_end_param = 5,country="India",include=None,exclude=None):
+         """
+            date_cols_names : column names having date
+            date_format : the date format (strpformat)
+            include : features names to be generated
+            exclude : feature names to be excluded while generating all features
+            return_whole_df : whether to to return the whole dataframe
+            drop_original_col : whether to drop the columns using which processing is done
+            close_to_start_month_end_param: No. of days specifiying how close is a given date close to start, end of a month
+            country : the country name for which holidays are considered
         """
-        close_to_start_month_end_param: No. of days specifiying how close is a given date close to start, end of a month
-        Example: 2, for January, close dates will be 1st, 2nd, 30th and 31st January
-        """
+
         self.return_whole_df = return_whole_df
         self.cols = []
         self.date_cols_names = date_cols_names
@@ -279,7 +311,7 @@ class DateHandler(TransformerMixin,BaseEstimator,Common):
         return self.return_transformed_df(copy,self.return_whole_df,self.drop_original_col,self.cols,self.added_cols,self.date_cols_names)
 
     def is_holiday(self,date):
-        return date in holidays.India(years=date.year)
+        return date in holidays.CountryHoliday(country=self.country,years=date.year)
     
     def get_quater(self,date):
         if date.month < 4:
@@ -303,10 +335,15 @@ class DateHandler(TransformerMixin,BaseEstimator,Common):
 class DateDiff(TransformerMixin,BaseEstimator,Common):
     """
     Considering the earliest date as 1 transforms all dates and adds a feature (kind of reference pointer)
-    
     """
     
     def __init__(self,date_cols_names:list,return_whole_df = True,drop_original_col = True,date_format = "%Y/%m/%d"):
+        """
+            date_cols_names : column names having date
+            date_format : the date format (strpformat)
+            return_whole_df : whether to to return the whole dataframe
+            drop_original_col : whether to drop the columns using which processing is done
+        """
         self.cols = []
         self.date_cols_names = date_cols_names
         
@@ -393,9 +430,16 @@ class NullPct(TransformerMixin,BaseEstimator):
     
 
 class IsNull(TransformerMixin,BaseEstimator,Common):
+    """
+        Adds a missingness indicator for all records in columns that have atleast one null value during fitting
+        Column null_pct and all columns ending with _is_outlier are excluded
+    """
     def __init__(self,return_whole_df= True,drop_original_col = True,include=None,exclude=None):
         """
-        Column null_pct and all columns ending with _is_outlier are excluded
+        include : features names to be generated
+        exclude : feature names to be excluded while generating all features
+        return_whole_df : whether to to return the whole dataframe
+        drop_original_col : whether to drop the columns using which processing is done
         """
         self.return_whole_df = return_whole_df
         self.drop_original_col = drop_original_col
@@ -434,6 +478,8 @@ class OutlierDetector(TransformerMixin,BaseEstimator, Common):
     
     def __init__(self,auto_infer_whether_guassian_dist=True, cols_gaussian_info={},gaussian_threshold=2,iqr_threshold=1.5,include=None,exclude=None):
         """
+            include : features names to be generated
+            exclude : feature names to be excluded while generating all features
             auto_infer_whether_guassian_dist : Automaticaly infer whether the feature follows guassian distribution for each feature (cols_gaussian_info should be empty)
             cols_gaussian_info : Pass column names and boolean value indicating whether the column follows a gaussian distribution or not (auto_infer_whether_guassian_dist should be False if this is not empty)
             Syntax: cols_guassian_info = {'col_A' : True, 'col_B' : False}
@@ -630,8 +676,14 @@ class Dropper(TransformerMixin,BaseEstimator):
         return list(set(self.cols).difference(set(self.cols_to_drop)))
     
 class ColumnSelector(BaseEstimator, TransformerMixin):
-
+    """
+        Used to select only certain columns
+    """
     def __init__(self, feature_names):
+        """
+            feature_names : column names to be selected
+        """
+        
         self._feature_names = feature_names 
 
     def fit(self, X, y = None):
@@ -640,9 +692,19 @@ class ColumnSelector(BaseEstimator, TransformerMixin):
     def transform(self, X, y = None):
         return X[self._feature_names]
     
+    def get_feature_names(self):
+        return self._feature_names
+    
 
 class ColumnNameApplyer(TransformerMixin,BaseEstimator):
+    """
+        Transforms the passed argument into a dataframe and applies the column names
+    """
     def __init__(self,column_names):
+        """
+            column_names : Column Names to be applied
+        """
+        
         self.column_names=column_names
         
 
