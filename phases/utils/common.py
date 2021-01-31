@@ -2,6 +2,51 @@ from IPython.display import display_html
 import re
 import pandas as pd
 
+def subtract_two_lists(a:list=[],b:list=[]) -> list:
+    """
+        returns a list of elements in a but not in b
+    """
+    
+    return list(set(a).difference(set(b)))
+
+def get_original_cat_cols(cols:list=[]):
+    """
+        Returns columns which don't end with _is_null or _is_outlier
+    """
+    return [i for i in cols if not (i.endswith("_is_null") or i.endswith("_is_outlier"))]
+
+def head(df,show=True):
+    """
+        Uses pandas dataframe head method, transposes the output
+        displays using display() if show = True, else returns it
+    """
+    if show:
+        display(df.head().transpose())
+    else:
+        return df.head().transpose()
+
+def tail(df,show=True):
+    """
+        Uses pandas dataframe tail method, transposes the output
+        displays using display() if show = True, else returns it
+    """
+    if show:
+        display(df.tail().transpose())
+    else:
+        return df.tail().transpose()
+    
+def sample(df,show=True,n=None,frac=None,axis=None):
+    """
+        Uses pandas dataframe sample method, transposes the output
+        Passes arguments n,frac,axis to the sample method
+        displays using display() if show = True, else returns it
+    """
+    if show:
+        display(df.sample(n=n,frac=frac,axis=axis).transpose())
+    else:
+        return df.sample(n=n,frac=frac,axis=axis).transpose()
+
+
 def display_side_by_side(dfs,mssg=None):
     html_str=''
     for index,df in enumerate(dfs):

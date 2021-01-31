@@ -454,6 +454,7 @@ class DateHandler(TransformerMixin,BaseEstimator,Common):
         self.close_to_start_month_end_param = close_to_start_month_end_param
         self.include = include
         self.exclude = exclude
+        self.country = country
 
 
     def fit(self,df,y=None):
