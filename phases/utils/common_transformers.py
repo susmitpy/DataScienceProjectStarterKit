@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.base import TransformerMixin,BaseEstimator
 from scipy.stats import iqr, shapiro
 import holidays
+from sklearn.preprocessing import FunctionTransformer
 
 class Common:
     def get_cols_needed(self,cols,include=None,exclude=None):
@@ -33,6 +34,9 @@ class Common:
             return df[added_cols]
         
         return df[processed_cols + added_cols]
+    
+LogTransformer = FunctionTransformer(func=np.log1p)
+SqrtTransformer = FunctionTransformer(func=np.sqrt)
 
 class PassThrough(TransformerMixin,BaseEstimator):
     def __init__(self):

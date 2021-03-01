@@ -58,29 +58,38 @@ def display_side_by_side(dfs,mssg=None):
         
     display_html(html_str.replace('table','table style="display:inline;padding:12px;margin:6px;padding-top:10px;"'),raw=True)
     
-def show_category_summary(df: pd.DataFrame, category_cols: list,target_col: str,target_col_dtype: str):
+def show_category_summary(df: pd.DataFrame, category_cols: list,target_col: str,target_col_dtype: str,normalize_over="columns"):
     """
         df : Dataframe
         category_cols : list of category columns
         target_col_dtype : num or cat
         target_col : name of target column
+        normalize_over : for multi - class classification this argument is passed to crosstab() normalize method
     """
     assert target_col_dtype in ["num","cat"], "target_col_dtype must be either num or cat"
     
     vcs = []
     mssgs = []
+    if target_col_dtype == "cat":
+        nunique = df[target_col].nunique()
     for col in category_cols:
         if target_col_dtype == "cat":
             agg_func = "mean"
             col_prefix = "% "
+            if nunique > 2:
+                tab = pd.crosstab(df[col],df[target_col],normalize=normalize_over) * 100
+                vcs.append(tab)
+                mssgs.append("")
+                continue
+            
         if target_col_dtype == "num":
             agg_func = "median"
             col_prefix = "Median "
 
-        grouped = pd.DataFrame(df.groupby(col)[target_col].agg(agg_func))
+        grouped = pd.DataFrame(df.groupby(col)[target_col].agg(agg_func))*100
         grouped.columns = [col_prefix + target_col]
 
-        vc = pd.DataFrame(df[col].value_counts(dropna=False,normalize=True))
+        vc = pd.DataFrame(df[col].value_counts(dropna=False,normalize=True)) * 100
         vc.columns = ["Count %"]
         ans = pd.concat([vc.sort_index(),grouped.sort_index()],axis=1)
         ans.index.name = col
