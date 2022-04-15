@@ -93,7 +93,7 @@ def show_category_summary(df: pd.DataFrame, category_cols: list,target_col: str,
         vc.columns = ["Count %"]
         ans = pd.concat([vc.sort_index(),grouped.sort_index()],axis=1)
         ans.index.name = col
-        ans.sort_values("Count %",ascending=False)
+        ans = ans.sort_values("Count %",ascending=False)
         vcs.append(ans.head(5))
         mssgs.append(f"Unique Categories : {len(vc)}")
 
